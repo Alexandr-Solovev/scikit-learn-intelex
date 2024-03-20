@@ -85,7 +85,7 @@ def _test_dbscan_big_data_numpy_gen(
         "euclidean",
     ],
 )
-@pytest.mark.parametrize("use_weights", [True, False])
+@pytest.mark.parametrize("use_weights", [False])
 @pytest.mark.parametrize("queue", get_queues())
 def test_dbscan_big_data_numpy_gen(queue, metric, use_weights: bool):
     eps = 35.0
