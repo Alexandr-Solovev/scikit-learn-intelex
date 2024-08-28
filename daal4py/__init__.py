@@ -26,7 +26,8 @@ if "Windows" in platform.system():
     print(arch_dir)
     plt_dict = {"x86_64": "intel64", "AMD64": "intel64", "aarch64": "arm"}
     arch_dir = plt_dict[arch_dir] if arch_dir in plt_dict else arch_dir
-
+    print("updated arch_dir")
+    print(arch_dir)
     current_path = os.path.dirname(__file__)
     path_to_env = site.getsitepackages()[0]
     print(path_to_env)
