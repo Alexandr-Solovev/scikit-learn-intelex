@@ -16,11 +16,13 @@
 # ==============================================================================
 
 import platform
+import dlltracer
+import sys
+
 
 if "Windows" in platform.system():
     import os
     import site
-    import sys
 
     arch_dir = platform.machine()
     print(arch_dir)
@@ -45,6 +47,10 @@ if "Windows" in platform.system():
                 print(os.environ["PATH"])
         os.add_dll_directory(path_to_libs)
     os.environ["PATH"] = path_to_libs + os.pathsep + os.environ["PATH"]
+
+    with dlltracer.Trace(out=sys.stdout):
+        import daal4py
+        from daal4py._daal4py import *
 
 try:
     from daal4py._daal4py import *
