@@ -177,22 +177,29 @@ def get_daal_type_defines():
 
 def get_libs(iface="daal"):
     major_version = ONEDAL_MAJOR_BINARY_VERSION
+    print(major_version)
     if IS_WIN:
         libraries_plat = [f"onedal_core_dll.{major_version}"]
+        print("searching libs here")
+        print(libraries_plat)
         onedal_lib = [
             f"onedal_dll.{major_version}",
         ]
+        print(onedal_lib)
         onedal_dpc_lib = [
             f"onedal_dpc_dll.{major_version}",
         ]
+        print(onedal_dpc_lib)
         if use_parameters_lib:
             onedal_lib += [
                 f"onedal_parameters.{major_version}",
                 f"onedal_parameters_dll.{major_version}",
             ]
+            print(onedal_lib)
             onedal_dpc_lib += [
                 f"onedal_parameters_dpc_dll.{major_version}",
             ]
+            print(onedal_dpc_lib)
     elif IS_MAC:
         libraries_plat = [
             f"onedal_core.{major_version}",
@@ -305,7 +312,7 @@ def get_build_options():
 def getpyexts():
     eca, ela, include_dir_plat = get_build_options()
     libraries_plat = get_libs("daal")
-
+    print("libs getting")
     exts = []
 
     ext = Extension(
@@ -325,8 +332,9 @@ def getpyexts():
         library_dirs=ONEDAL_LIBDIRS,
         language="c++",
     )
+    print("extension class has been crerated")
     exts.extend(cythonize(ext, nthreads=n_threads))
-
+    print("extension class has been crerated")
     if not no_dist:
         mpi_include_dir = include_dir_plat + [np.get_include()] + MPI_INCDIRS
         mpi_depens = glob.glob(jp(os.path.abspath("src"), "*.h"))
