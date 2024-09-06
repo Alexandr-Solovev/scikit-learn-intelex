@@ -24,34 +24,38 @@ if "Windows" in platform.system():
 
     print("here begin")
     arch_dir = platform.machine()
-    print(arch_dir)
+    print(f"Detected architecture: {arch_dir}")
     plt_dict = {"x86_64": "intel64", "AMD64": "intel64", "aarch64": "arm"}
-    print(plt_dict)
+
     arch_dir = plt_dict[arch_dir] if arch_dir in plt_dict else arch_dir
-    print(arch_dir)
+    print(f"Mapped architecture directory: {arch_dir}")
     current_path = os.path.dirname(__file__)
-    print(current_path)
+    print(f"Current path: {current_path}")
+    print("Current directory contents:", os.listdir(current_path)) 
     path_to_env = site.getsitepackages()[0]
-    print(path_to_env)
+    print(f"Python site-packages path: {path_to_env}")
     path_to_libs = os.path.join(path_to_env, "Library", "bin")
-    print(path_to_libs)
+    print(f"Path to libraries: {path_to_libs}")
+    print("Library directory contents:", os.listdir(path_to_libs))
+
     if sys.version_info.minor >= 8:
         if "DALROOT" in os.environ:
-            print("DALROOT is here")
+            print("DALROOT is present in environment variables.")
             dal_root_redist = os.path.join(os.environ["DALROOT"], "redist", arch_dir)
-            print("DAL root redist is below")
-            print(dal_root_redist)
+            print(f"DAL root redist directory: {dal_root_redist}")
             if os.path.exists(dal_root_redist):
-                print("if cond 1")
+                print("DAL root redist directory exists.")
+                print("DAL redist directory contents:", os.listdir(dal_root_redist)) 
                 os.add_dll_directory(dal_root_redist)
                 os.environ["PATH"] = dal_root_redist + os.pathsep + os.environ["PATH"]
                 print(os.environ["PATH"])
 
         try:
-            print("here begin 3")
+            print("Attempting to add path to libraries...")
             os.add_dll_directory(path_to_libs)
-        except FileNotFoundError:
-            pass
+        except FileNotFoundError as e:
+            print(f"Error adding DLL directory: {e}")
+    
     print("final path")
     os.environ["PATH"] = path_to_libs + os.pathsep + os.environ["PATH"]
     print(os.environ["PATH"])
