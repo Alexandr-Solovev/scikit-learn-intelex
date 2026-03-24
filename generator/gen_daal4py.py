@@ -256,6 +256,21 @@ class cython_interface(object):
             v = parse_version(header)
             self.version = (int(v[0]), int(v[1]), int(v[2]), str(v[3]))
             print("Found oneDAL version {}.{}.{}.{}".format(*self.version))
+            # For oneDAL >= 2026, engines are removed from the public API;
+            # ignore the engine parameter in all algorithms that had it
+            if self.version[:2] >= (2026, 0):
+                engine_namespaces = [
+                    "algorithms::decision_forest::training",
+                    "algorithms::gbt::training",
+                    "algorithms::kmeans::init",
+                    "algorithms::em_gmm::init",
+                    "algorithms::optimization_solver::lbfgs",
+                    "algorithms::optimization_solver::coordinate_descent",
+                ]
+                for ns in engine_namespaces:
+                    ignore.setdefault(ns, []).append("engine")
+                ifaces.pop("engines::BatchBase", None)
+                ifaces.pop("engines::FamilyBatchBase", None)
 
     ###############################################################################
     # Postprocessing starts here

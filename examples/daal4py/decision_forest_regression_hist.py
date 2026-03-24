@@ -41,9 +41,7 @@ def main(readcsv=pd_read_csv, method="hist"):
     )
     if not daal_check_version((2026, "P", 0)):
         train_params["engine"] = d4p.engines_mt2203(seed=777)
-    train_algo = d4p.decision_forest_regression_training(
-        method=method, **train_params
-    )
+    train_algo = d4p.decision_forest_regression_training(method=method, **train_params)
 
     # Read data. Let's have 13 independent,
     # and 1 dependent variables (for each observation)
