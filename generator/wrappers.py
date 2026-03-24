@@ -59,11 +59,6 @@ def wrap_algo(algo, ver):
             "algorithms::distributions::bernoulli",
             "algorithms::distributions::normal",
             "algorithms::distributions::uniform",
-            "algorithms::engines::mt19937",
-            "algorithms::engines::mt2203",
-            "algorithms::engines::mcg59",
-            "algorithms::engines::mrg32k3a",
-            "algorithms::engines::philox4x32x10",
             "algorithms::multinomial_naive_bayes",
             "algorithms::multinomial_naive_bayes::prediction",
             "algorithms::multinomial_naive_bayes::training",
@@ -93,6 +88,18 @@ def wrap_algo(algo, ver):
             "algorithms::tree_utils::classification",
             "algorithms::tree_utils::regression",
             "algorithms::internal",
+        ]
+    ):
+        return False
+    # ignore engines for oneDAL >= 2026 (engines removed from public API)
+    if ver >= (2026, 0) and any(
+        algo.endswith(x)
+        for x in [
+            "algorithms::engines::mt19937",
+            "algorithms::engines::mt2203",
+            "algorithms::engines::mcg59",
+            "algorithms::engines::mrg32k3a",
+            "algorithms::engines::philox4x32x10",
         ]
     ):
         return False

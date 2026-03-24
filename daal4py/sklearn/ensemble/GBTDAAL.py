@@ -26,7 +26,7 @@ from sklearn.utils.multiclass import check_classification_targets
 from sklearn.utils.validation import check_array, check_is_fitted, check_X_y
 
 import daal4py as d4p
-from daal4py.sklearn._utils import sklearn_check_version
+from daal4py.sklearn._utils import daal_check_version, sklearn_check_version
 
 from .._n_jobs_support import control_n_jobs
 from .._utils import getFPType
@@ -177,7 +177,7 @@ class GBTDAALClassifier(ClassifierMixin, GBTDAALBase):
         fptype = getFPType(X)
 
         # Fit the model
-        train_algo = d4p.gbt_classification_training(
+        train_params = dict(
             fptype=fptype,
             nClasses=self.n_classes_,
             splitMethod=self.split_method,
@@ -193,6 +193,9 @@ class GBTDAALClassifier(ClassifierMixin, GBTDAALBase):
             maxBins=self.max_bins,
             minBinSize=self.min_bin_size,
         )
+        if not daal_check_version((2026, "P", 0)):
+            train_params["engine"] = d4p.engines_mcg59(seed=seed_)
+        train_algo = d4p.gbt_classification_training(**train_params)
         train_result = train_algo.compute(X, y_)
 
         # Store the model
@@ -283,7 +286,7 @@ class GBTDAALRegressor(RegressorMixin, GBTDAALBase):
         fptype = getFPType(X)
 
         # Fit the model
-        train_algo = d4p.gbt_regression_training(
+        train_params = dict(
             fptype=fptype,
             splitMethod=self.split_method,
             maxIterations=self.max_iterations,
@@ -298,6 +301,9 @@ class GBTDAALRegressor(RegressorMixin, GBTDAALBase):
             maxBins=self.max_bins,
             minBinSize=self.min_bin_size,
         )
+        if not daal_check_version((2026, "P", 0)):
+            train_params["engine"] = d4p.engines_mcg59(seed=seed_)
+        train_algo = d4p.gbt_regression_training(**train_params)
         train_result = train_algo.compute(X, y_)
 
         # Store the model

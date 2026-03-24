@@ -742,6 +742,9 @@ class RandomForestClassifier(RandomForestClassifier_original, RandomForestBase):
             "resultsToCompute": "",
             "varImportance": "MDI",
         }
+        if not daal_check_version((2026, "P", 0)):
+            daal_engine = daal4py.engines_mt19937(seed=seed_, fptype=getFPType(X))
+            parameters["engine"] = daal_engine
 
         if isinstance(self.min_samples_split, numbers.Integral):
             parameters["minObservationsInSplitNode"] = self.min_samples_split
@@ -1218,6 +1221,9 @@ class RandomForestRegressor(RandomForestRegressor_original, RandomForestBase):
             "resultsToCompute": "",
             "varImportance": "MDI",
         }
+        if not daal_check_version((2026, "P", 0)):
+            daal_engine = daal4py.engines_mt19937(seed=seed_, fptype=getFPType(X))
+            parameters["engine"] = daal_engine
 
         if isinstance(self.min_samples_split, numbers.Integral):
             parameters["minObservationsInSplitNode"] = self.min_samples_split

@@ -35,7 +35,12 @@ from sklearn.utils.validation import (
 import daal4py
 
 from .._n_jobs_support import control_n_jobs
-from .._utils import PatchingConditionsChain, getFPType, sklearn_check_version
+from .._utils import (
+    PatchingConditionsChain,
+    daal_check_version,
+    getFPType,
+    sklearn_check_version,
+)
 from ..utils.validation import check_feature_names, validate_data
 
 if sklearn_check_version("1.1"):
@@ -77,24 +82,39 @@ def _daal4py_compute_starting_centroids(
     is_sparse = sp.issparse(X)
 
     deterministic = False
+    _engines_removed = daal_check_version((2026, "P", 0))
     if is_string(cluster_centers_0, "k-means++"):
         plus_plus_method = "plusPlusCSR" if is_sparse else "plusPlusDense"
         _n_local_trials = 2 + int(np.log(nClusters))
-        kmeans_init = daal4py.kmeans_init(
-            nClusters,
+        kmeans_init_params = dict(
+            nClusters=nClusters,
             fptype=X_fptype,
             nTrials=_n_local_trials,
             method=plus_plus_method,
         )
+        if not _engines_removed:
+            _seed = random_state.randint(np.iinfo("i").max)
+            daal_engine = daal4py.engines_mt19937(
+                fptype=X_fptype, method="defaultDense", seed=_seed
+            )
+            kmeans_init_params["engine"] = daal_engine
+        kmeans_init = daal4py.kmeans_init(**kmeans_init_params)
         kmeans_init_res = kmeans_init.compute(X)
         centroids_ = kmeans_init_res.centroids
     elif is_string(cluster_centers_0, "random"):
         random_method = "randomCSR" if is_sparse else "randomDense"
-        kmeans_init = daal4py.kmeans_init(
-            nClusters,
+        kmeans_init_params = dict(
+            nClusters=nClusters,
             fptype=X_fptype,
             method=random_method,
         )
+        if not _engines_removed:
+            _seed = random_state.randint(np.iinfo("i").max)
+            daal_engine = daal4py.engines_mt19937(
+                seed=_seed, fptype=X_fptype, method="defaultDense"
+            )
+            kmeans_init_params["engine"] = daal_engine
+        kmeans_init = daal4py.kmeans_init(**kmeans_init_params)
         kmeans_init_res = kmeans_init.compute(X)
         centroids_ = kmeans_init_res.centroids
     elif hasattr(cluster_centers_0, "__array__"):

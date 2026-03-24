@@ -22,6 +22,7 @@ import numpy as np
 from readcsv import pd_read_csv
 
 import daal4py as d4p
+from daal4py.sklearn._utils import daal_check_version
 
 
 def main(readcsv=pd_read_csv, method="hist"):
@@ -31,9 +32,7 @@ def main(readcsv=pd_read_csv, method="hist"):
     testfile = data_path / "df_classification_test.csv"
 
     # Configure a training object (5 classes)
-    train_algo = d4p.decision_forest_classification_training(
-        5,
-        method=method,
+    train_params = dict(
         maxBins=256,
         minBinSize=1,
         nTrees=10,
@@ -42,6 +41,11 @@ def main(readcsv=pd_read_csv, method="hist"):
         varImportance="MDI",
         bootstrap=True,
         resultsToCompute="computeOutOfBagError",
+    )
+    if not daal_check_version((2026, "P", 0)):
+        train_params["engine"] = d4p.engines_mt19937(seed=777)
+    train_algo = d4p.decision_forest_classification_training(
+        5, method=method, **train_params
     )
 
     # Read data. Let's use 3 features per observation
