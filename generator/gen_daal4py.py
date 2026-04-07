@@ -271,6 +271,7 @@ class cython_interface(object):
                     ignore.setdefault(ns, []).append("engine")
                 ifaces.pop("engines::BatchBase", None)
                 ifaces.pop("engines::FamilyBatchBase", None)
+                ifaces.pop("engines::FamilyBatchBase", None)
 
     ###############################################################################
     # Postprocessing starts here
