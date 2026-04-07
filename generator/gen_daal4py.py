@@ -271,7 +271,6 @@ class cython_interface(object):
                     ignore.setdefault(ns, []).append("engine")
                 ifaces.pop("engines::BatchBase", None)
                 ifaces.pop("engines::FamilyBatchBase", None)
-                ifaces.pop("engines::FamilyBatchBase", None)
 
     ###############################################################################
     # Postprocessing starts here
@@ -401,6 +400,10 @@ class cython_interface(object):
             return ("bool", "stdtype", "")
         if t == "algorithmFPType":
             return ("double", "stdtype", "")
+        # For oneDAL >= 2026, engines are removed from the public API;
+        # skip any EnginePtr parameter regardless of which algorithm uses it
+        if self.version[:2] >= (2026, 0) and "EnginePtr" in t:
+            return None
         if t.endswith("ModelPtr"):
             thens = self.get_ns(ns, t, attrs=["typedefs"])
             return ("daal::" + thens + "::ModelPtr", "class", tns)
