@@ -20,11 +20,20 @@ from collections.abc import Sequence
 
 import scipy.sparse as sp
 from sklearn.utils.validation import _assert_all_finite as _sklearn_assert_all_finite
-from sklearn.utils.validation import _num_samples, check_array, check_non_negative
+from sklearn.utils.validation import (
+    _num_samples,
+    check_array,
+    check_non_negative,
+)
 
 from daal4py.sklearn._utils import daal_check_version, sklearn_check_version
+
+# Note: 'check_feature_names' is reimported from this file elsewhere
 from daal4py.sklearn.utils.validation import add_dispatcher_docstring, check_feature_names
 from onedal.utils.validation import is_contiguous
+
+if sklearn_check_version("1.9"):
+    from sklearn.utils.validation import _check_estimator_name
 
 from ._array_api import get_namespace
 
@@ -40,7 +49,7 @@ else:
 
 
 if daal_check_version((2024, "P", 700)):
-    from onedal.utils.validation import _assert_all_finite as _onedal_assert_all_finite
+    from onedal.utils.validation import check_all_finite
 
     def _onedal_supported_format(X, xp):
         # data should be checked if contiguous, as oneDAL will only use contiguous
@@ -50,7 +59,7 @@ if daal_check_version((2024, "P", 700)):
         return X.dtype in [xp.float32, xp.float64] and is_contiguous(X)
 
 else:
-    from daal4py.utils.validation import _assert_all_finite as _onedal_assert_all_finite
+    from daal4py.utils.validation import _assert_all_finite as _d4p_assert_all_finite
     from onedal.utils._array_api import _is_numpy_namespace
 
     def _onedal_supported_format(X, xp):
@@ -58,11 +67,19 @@ else:
         # defined check to validate inputs, otherwise offload to sklearn
         return X.dtype in [xp.float32, xp.float64] and _is_numpy_namespace(xp)
 
+    def check_all_finite(X, allow_nan: bool = False) -> bool:
+        try:
+            _d4p_assert_all_finite(X, allow_nan=allow_nan)
+            return True
+        except ValueError:
+            return False
+
 
 def _sklearnex_assert_all_finite(
     X,
     *,
     allow_nan=False,
+    estimator_name=None,
     input_name="",
 ):
     # size check is an initial match to daal4py for performance reasons, can be
@@ -72,25 +89,79 @@ def _sklearnex_assert_all_finite(
     too_small = math.prod(X.shape) < 32768
 
     if too_small or not _onedal_supported_format(X, xp):
-        if sklearn_check_version("1.1"):
+        if sklearn_check_version("1.9"):
+            _sklearn_assert_all_finite(
+                X,
+                allow_nan=allow_nan,
+                input_name=input_name,
+                estimator_name=estimator_name,
+            )
+        elif sklearn_check_version("1.1"):
             _sklearn_assert_all_finite(X, allow_nan=allow_nan, input_name=input_name)
         else:
             _sklearn_assert_all_finite(X, allow_nan=allow_nan)
     else:
-        _onedal_assert_all_finite(X, allow_nan=allow_nan, input_name=input_name)
+        all_finite = check_all_finite(
+            X,
+            allow_nan=allow_nan,
+        )
+        if not all_finite:
+            type_err = "infinity" if allow_nan else "NaN, infinity"
+            padded_input_name = input_name + " " if input_name else ""
+            msg_err = f"Input {padded_input_name}contains {type_err}."
+            if (
+                estimator_name is not None
+                and input_name == "X"
+                and not allow_nan
+                and sklearn_check_version("1.9")
+            ):
+                if xp.any(xp.isnan(X)):
+                    msg_err += (
+                        f"\n{estimator_name} does not accept missing values"
+                        " encoded as NaN natively. For supervised learning, you might want"
+                        " to consider sklearn.ensemble.HistGradientBoostingClassifier and"
+                        " Regressor which accept missing values encoded as NaNs natively."
+                        " Alternatively, it is possible to preprocess the data, for"
+                        " instance by using an imputer transformer in a pipeline or drop"
+                        " samples with missing values. See"
+                        " https://scikit-learn.org/stable/modules/impute.html"
+                        " You can find a list of all estimators that handle NaN values"
+                        " at the following page:"
+                        " https://scikit-learn.org/stable/modules/impute.html"
+                        "#estimators-that-handle-nan-values"
+                    )
+            raise ValueError(msg_err)
 
 
-def assert_all_finite(
-    X,
-    *,
-    allow_nan=False,
-    input_name="",
-):
-    _sklearnex_assert_all_finite(
-        X.data if sp.issparse(X) else X,
-        allow_nan=allow_nan,
-        input_name=input_name,
-    )
+if sklearn_check_version("1.9"):
+
+    def assert_all_finite(
+        X,
+        *,
+        allow_nan=False,
+        estimator_name=None,
+        input_name="",
+    ):
+        _sklearnex_assert_all_finite(
+            X.data if sp.issparse(X) else X,
+            allow_nan=allow_nan,
+            input_name=input_name,
+            estimator_name=estimator_name,
+        )
+
+else:
+
+    def assert_all_finite(
+        X,
+        *,
+        allow_nan=False,
+        input_name="",
+    ):
+        _sklearnex_assert_all_finite(
+            X.data if sp.issparse(X) else X,
+            allow_nan=allow_nan,
+            input_name=input_name,
+        )
 
 
 @add_dispatcher_docstring(_sklearn_validate_data)
@@ -120,6 +191,12 @@ def validate_data(
     if ensure_all_finite:
         # run local finite check
         allow_nan = ensure_all_finite == "allow-nan"
+        if sklearn_check_version("1.9"):
+            kwargs_assert_all_finite = {
+                "estimator_name": _check_estimator_name(_estimator)
+            }
+        else:
+            kwargs_assert_all_finite = {}
         # the return object from validate_data can be a single
         # element (either x or y) or both (as a tuple). An iterator along with
         # check_x and check_y can go through the output properly without
@@ -127,9 +204,13 @@ def validate_data(
         # is used
         arg = iter(out if isinstance(out, tuple) else (out,))
         if check_x:
-            assert_all_finite(next(arg), allow_nan=allow_nan, input_name="X")
+            assert_all_finite(
+                next(arg), allow_nan=allow_nan, input_name="X", **kwargs_assert_all_finite
+            )
         if check_y:
-            assert_all_finite(next(arg), allow_nan=allow_nan, input_name="y")
+            assert_all_finite(
+                next(arg), allow_nan=allow_nan, input_name="y", **kwargs_assert_all_finite
+            )
 
     if check_y and kwargs.get("y_numeric", False):
         # validate_data does not do full dtype conversions, as it uses check_X_y

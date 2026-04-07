@@ -462,7 +462,12 @@ def _is_csr(x):
     )
 
 
-def _assert_all_finite(X, allow_nan=False, input_name=""):
+def check_all_finite(
+    X,
+    allow_nan: bool = False,
+) -> bool:
+    if sp.issparse(X):
+        X = X.data
     backend_method = BackendFunction(
         backend.finiteness_checker.compute.compute, backend, "compute", no_policy=False
     )
@@ -474,24 +479,7 @@ def _assert_all_finite(X, allow_nan=False, input_name=""):
     }
     with QM.manage_global_queue(None, X):
         # Must use the queue provided by X
-        if not backend_method(params, X_t).finite:
-            type_err = "infinity" if allow_nan else "NaN, infinity"
-            padded_input_name = input_name + " " if input_name else ""
-            msg_err = f"Input {padded_input_name}contains {type_err}."
-            raise ValueError(msg_err)
-
-
-def assert_all_finite(
-    X,
-    *,
-    allow_nan=False,
-    input_name="",
-):
-    _assert_all_finite(
-        X.data if sp.issparse(X) else X,
-        allow_nan=allow_nan,
-        input_name=input_name,
-    )
+        return bool(backend_method(params, X_t).finite)
 
 
 def is_contiguous(X):

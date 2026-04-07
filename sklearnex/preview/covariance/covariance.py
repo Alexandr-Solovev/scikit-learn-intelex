@@ -31,7 +31,6 @@ from onedal.utils._array_api import _is_numpy_namespace
 from onedal.utils.validation import _num_features
 from sklearnex import config_context
 
-from ..._config import get_config
 from ..._device_offload import dispatch, wrap_output_data
 from ..._utils import PatchingConditionsChain, register_hyperparameters
 from ...base import oneDALEstimator
@@ -40,6 +39,8 @@ from ...utils.validation import assert_all_finite, validate_data
 
 # This is a temporary workaround for issues with sklearnex._device_offload._get_host_inputs
 # passing kwargs with sycl queues with other host data will cause failures
+# Note: this wrapper could potentially be removed later if sklearn implements
+# array API support for this metric in their pairwise_distances class.
 _mahalanobis = support_input_format(partial(pairwise_distances, metric="mahalanobis"))
 
 
@@ -55,12 +56,11 @@ class EmpiricalCovariance(oneDALEstimator, _sklearn_EmpiricalCovariance):
         }
 
     def _set_covariance(self, covariance):
-        if not get_config()["use_raw_input"]:
-            if sklearn_check_version("1.6"):
-                covariance = check_array(covariance, ensure_all_finite=False)
-            else:
-                covariance = check_array(covariance, force_all_finite=False)
-            assert_all_finite(covariance)
+        if sklearn_check_version("1.6"):
+            covariance = check_array(covariance, ensure_all_finite=False)
+        else:
+            covariance = check_array(covariance, force_all_finite=False)
+        assert_all_finite(covariance)
         # set covariance
         self.covariance_ = covariance
         # set precision
@@ -84,9 +84,8 @@ class EmpiricalCovariance(oneDALEstimator, _sklearn_EmpiricalCovariance):
     _onedal_covariance = staticmethod(onedal_EmpiricalCovariance)
 
     def _onedal_fit(self, X, queue=None):
-        if not get_config()["use_raw_input"]:
-            xp, _ = get_namespace(X)
-            X = validate_data(self, X, dtype=[xp.float64, xp.float32])
+        xp, _ = get_namespace(X)
+        X = validate_data(self, X, dtype=[xp.float64, xp.float32])
 
         if X.shape[0] == 1:
             warnings.warn(
@@ -145,7 +144,7 @@ class EmpiricalCovariance(oneDALEstimator, _sklearn_EmpiricalCovariance):
     def score(self, X_test, y=None):
 
         check_is_fitted(self)
-        # Only covariance evaluated for get_namespace due to dpnp/dpctl
+        # Only covariance evaluated for get_namespace due to dpnp
         # support without array_api_dispatch
         xp, _ = get_namespace(X_test, self.covariance_)
 
@@ -177,9 +176,9 @@ class EmpiricalCovariance(oneDALEstimator, _sklearn_EmpiricalCovariance):
         # in the case of numpy-like inputs it will use sklearn's version instead.
         # This can be deprecated if/when sklearn makes the equivalent array API enabled.
         # This includes a validate_data call and an unusual call to get_namespace in
-        # order to also support dpnp/dpctl without array_api_dispatch.
+        # order to also support dpnp without array_api_dispatch.
         check_is_fitted(self)
-        # Only covariance evaluated for get_namespace due to dpnp/dpctl
+        # Only covariance evaluated for get_namespace due to dpnp
         # support without array_api_dispatch
         xp, _ = get_namespace(comp_cov, self.covariance_)
         c_cov = validate_data(
@@ -228,7 +227,7 @@ class EmpiricalCovariance(oneDALEstimator, _sklearn_EmpiricalCovariance):
         X_in = validate_data(self, X, reset=False)
 
         if not _is_numpy_namespace(xp) and isinstance(X_in, np.ndarray):
-            # corrects issues with respect to dpnp/dpctl support without array_api_dispatch
+            # corrects issues with respect to dpnp support without array_api_dispatch
             X_in = X
             loc = xp.asarray(loc, device=X.device)
             precision = xp.asarray(precision, device=X.device)
