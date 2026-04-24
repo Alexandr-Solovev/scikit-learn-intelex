@@ -206,6 +206,16 @@ Clustering
        - ``metric`` != `'euclidean'` or `'minkowski'` with ``p`` != `2`
        - ``algorithm`` not in [`'brute'`, `'auto'`]
      - Only dense data is supported
+   * - :obj:`sklearn.cluster.HDBSCAN`
+     - All parameters are supported except:
+
+       - ``metric`` not in [``'euclidean'``, ``'manhattan'``, ``'minkowski'``, ``'chebyshev'``, ``'cosine'``]
+       - ``cluster_selection_method`` != ``'eom'``
+       - ``cluster_selection_epsilon`` != ``0.0``
+       - ``max_cluster_size`` is specified
+       - ``allow_single_cluster`` = ``True``
+       - ``store_centers`` is specified
+     - Only dense data is supported
 
 Dimensionality Reduction
 ************************
@@ -514,6 +524,16 @@ Clustering
        - ``metric`` != `'euclidean'`
        - ``algorithm`` not in [`'brute'`, `'auto'`]
      - Only dense data is supported
+   * - :obj:`sklearn.cluster.HDBSCAN`
+     - All parameters are supported except:
+
+       - ``metric`` not in [``'euclidean'``, ``'manhattan'``, ``'minkowski'``, ``'chebyshev'``, ``'cosine'``]
+       - ``cluster_selection_method`` != ``'eom'``
+       - ``cluster_selection_epsilon`` != ``0.0``
+       - ``max_cluster_size`` is specified
+       - ``allow_single_cluster`` = ``True``
+       - ``store_centers`` is specified
+     - Only dense data is supported
 
 Dimensionality Reduction
 ************************
@@ -533,7 +553,7 @@ Dimensionality Reduction
        - ``svd_solver`` not in [`'full'`, `'covariance_eigh'`, `'onedal_svd'`]
        - For |sklearn| < 1.5: `'full'` solver is automatically mapped to `'covariance_eigh'`
      - Sparse data is not supported
-     - 
+     -
    * - :obj:`sklearn.decomposition.IncrementalPCA`
      - All parameters are supported except:
 
@@ -758,6 +778,16 @@ Clustering
        - ``metric`` != `'euclidean'`
        - ``algorithm`` not in [`'brute'`, `'auto'`]
      - Only dense data is supported
+   * - :obj:`sklearn.cluster.HDBSCAN`
+     - All parameters are supported except:
+
+       - ``metric`` not in [``'euclidean'``, ``'manhattan'``, ``'minkowski'``, ``'chebyshev'``, ``'cosine'``]
+       - ``cluster_selection_method`` != ``'eom'``
+       - ``cluster_selection_epsilon`` != ``0.0``
+       - ``max_cluster_size`` is specified
+       - ``allow_single_cluster`` = ``True``
+       - ``store_centers`` is specified
+     - Only dense data is supported
 
 Dimensionality Reduction
 ************************
@@ -777,7 +807,7 @@ Dimensionality Reduction
        - ``svd_solver`` not in [`'full'`, `'covariance_eigh'`, `'onedal_svd'`]
        - For |sklearn| < 1.5: `'full'` solver is automatically mapped to `'covariance_eigh'`
      - Sparse data is not supported
-     - 
+     -
    * - :obj:`sklearn.decomposition.IncrementalPCA`
      - All parameters are supported except:
 

@@ -28,12 +28,7 @@ from onedal.tests.utils._dataframes_support import (
 )
 
 
-# The onedal low-level layer only accepts numpy arrays (not pandas DataFrames).
-# Filter to numpy-only to avoid to_table() conversion errors on pandas input.
-_numpy_only = [p for p in get_dataframes_and_queues() if p.id == "numpy"]
-
-
-@pytest.mark.parametrize("dataframe,queue", _numpy_only)
+@pytest.mark.parametrize("dataframe,queue", get_dataframes_and_queues("numpy"))
 def test_onedal_hdbscan_basic(dataframe, queue):
     """Basic HDBSCAN fit and label output."""
     X, y_true = make_blobs(
@@ -50,7 +45,7 @@ def test_onedal_hdbscan_basic(dataframe, queue):
     assert n_clusters >= 2, f"Expected >=2 clusters, got {n_clusters}"
 
 
-@pytest.mark.parametrize("dataframe,queue", _numpy_only)
+@pytest.mark.parametrize("dataframe,queue", get_dataframes_and_queues("numpy"))
 def test_onedal_hdbscan_correctness(dataframe, queue):
     """HDBSCAN should achieve high ARI on well-separated blobs."""
     X, y_true = make_blobs(
@@ -65,7 +60,7 @@ def test_onedal_hdbscan_correctness(dataframe, queue):
     assert ari > 0.9, f"ARI too low: {ari}"
 
 
-@pytest.mark.parametrize("dataframe,queue", _numpy_only)
+@pytest.mark.parametrize("dataframe,queue", get_dataframes_and_queues("numpy"))
 @pytest.mark.parametrize("metric", ["euclidean", "manhattan", "chebyshev"])
 def test_onedal_hdbscan_metrics(dataframe, queue, metric):
     """HDBSCAN with different distance metrics."""
@@ -82,7 +77,7 @@ def test_onedal_hdbscan_metrics(dataframe, queue, metric):
     assert n_clusters >= 2, f"Expected >=2 clusters with {metric}, got {n_clusters}"
 
 
-@pytest.mark.parametrize("dataframe,queue", _numpy_only)
+@pytest.mark.parametrize("dataframe,queue", get_dataframes_and_queues("numpy"))
 @pytest.mark.parametrize("dtype", [np.float32, np.float64])
 def test_onedal_hdbscan_dtypes(dataframe, queue, dtype):
     """HDBSCAN with float32 and float64."""
@@ -98,7 +93,7 @@ def test_onedal_hdbscan_dtypes(dataframe, queue, dtype):
     assert n_clusters >= 2, f"Expected >=2 clusters with {dtype}, got {n_clusters}"
 
 
-@pytest.mark.parametrize("dataframe,queue", _numpy_only)
+@pytest.mark.parametrize("dataframe,queue", get_dataframes_and_queues("numpy"))
 def test_onedal_hdbscan_algorithm_auto(dataframe, queue):
     """Algorithm='auto' should pick kd_tree for euclidean."""
     X, _ = make_blobs(n_samples=200, centers=3, cluster_std=0.5, random_state=42)
@@ -112,7 +107,7 @@ def test_onedal_hdbscan_algorithm_auto(dataframe, queue):
     assert n_clusters >= 2
 
 
-@pytest.mark.parametrize("dataframe,queue", _numpy_only)
+@pytest.mark.parametrize("dataframe,queue", get_dataframes_and_queues("numpy"))
 def test_onedal_hdbscan_min_samples_none(dataframe, queue):
     """When min_samples=None, uses min_cluster_size as default."""
     X, _ = make_blobs(n_samples=200, centers=3, cluster_std=0.5, random_state=42)

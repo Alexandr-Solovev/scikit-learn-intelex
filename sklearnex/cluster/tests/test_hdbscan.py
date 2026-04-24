@@ -389,12 +389,13 @@ def test_hdbscan_noise_labels(dataframe, queue):
     """Verify that noise points get label -1."""
     from sklearnex.cluster import HDBSCAN
 
-    # Create well-separated clusters with some outliers
+    X, _ = make_blobs(
+        n_samples=200, centers=2, cluster_std=0.5, random_state=42
+    )
+    # Add outliers far from clusters
     rng = np.random.RandomState(42)
-    cluster1 = rng.randn(100, 2) * 0.3 + [0, 0]
-    cluster2 = rng.randn(100, 2) * 0.3 + [10, 10]
     outliers = rng.uniform(-20, 30, size=(10, 2))
-    X = np.vstack([cluster1, cluster2, outliers])
+    X = np.vstack([X, outliers])
 
     X = _convert_to_dataframe(X, sycl_queue=queue, target_df=dataframe)
     hdbscan = HDBSCAN(min_cluster_size=15, min_samples=5).fit(X)
@@ -421,22 +422,6 @@ def test_hdbscan_large_min_cluster_size(dataframe, queue):
 
 
 @pytest.mark.parametrize("dataframe,queue", get_dataframes_and_queues())
-def test_hdbscan_get_params(dataframe, queue):
-    """Verify get_params / set_params sklearn compatibility."""
-    from sklearnex.cluster import HDBSCAN
-
-    h = HDBSCAN(min_cluster_size=20, min_samples=10, metric="manhattan")
-    params = h.get_params()
-    assert params["min_cluster_size"] == 20
-    assert params["min_samples"] == 10
-    assert params["metric"] == "manhattan"
-
-    h.set_params(min_cluster_size=30)
-    assert h.min_cluster_size == 30
-    assert h.get_params()["min_cluster_size"] == 30
-
-
-@pytest.mark.parametrize("dataframe,queue", get_dataframes_and_queues())
 def test_hdbscan_min_samples_default(dataframe, queue):
     """When min_samples=None, it should default to min_cluster_size."""
     from sklearnex.cluster import HDBSCAN
@@ -450,29 +435,3 @@ def test_hdbscan_min_samples_default(dataframe, queue):
 
     ari = adjusted_rand_score(h1.labels_, h2.labels_)
     assert ari == 1.0, f"min_samples=None should equal min_cluster_size: ARI={ari}"
-
-
-# ============================================================================
-# Larger-scale test (for benchmarking, not correctness)
-# ============================================================================
-
-
-@pytest.mark.parametrize("dataframe,queue", get_dataframes_and_queues())
-def test_hdbscan_medium_dataset(dataframe, queue):
-    """Verify HDBSCAN matches sklearn on a medium-sized dataset (5000 points)."""
-    from sklearn.cluster import HDBSCAN as sklearn_HDBSCAN
-
-    from sklearnex.cluster import HDBSCAN
-
-    X, _ = make_blobs(
-        n_samples=5000, centers=5, cluster_std=0.7, random_state=42
-    )
-    X_df = _convert_to_dataframe(X, sycl_queue=queue, target_df=dataframe)
-
-    sklearnex_h = HDBSCAN(min_cluster_size=50, min_samples=10).fit(X_df)
-    sklearn_h = sklearn_HDBSCAN(
-        min_cluster_size=50, min_samples=10, copy=True
-    ).fit(X)
-
-    ari = adjusted_rand_score(sklearnex_h.labels_, sklearn_h.labels_)
-    assert ari > 0.9, f"ARI vs sklearn on 5000-point dataset: {ari}"

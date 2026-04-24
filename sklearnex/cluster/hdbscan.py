@@ -20,7 +20,6 @@ from sklearn.cluster import HDBSCAN as _sklearn_HDBSCAN
 from daal4py.sklearn._n_jobs_support import control_n_jobs
 from daal4py.sklearn._utils import is_sparse, sklearn_check_version
 from onedal.cluster import HDBSCAN as onedal_HDBSCAN
-from onedal.utils._array_api import _is_numpy_namespace
 
 from .._device_offload import dispatch
 from .._utils import PatchingConditionsChain
@@ -37,58 +36,10 @@ class HDBSCAN(oneDALEstimator, _sklearn_HDBSCAN):
     if sklearn_check_version("1.2"):
         _parameter_constraints: dict = {**_sklearn_HDBSCAN._parameter_constraints}
 
-    def __init__(
-        self,
-        min_cluster_size=5,
-        min_samples=None,
-        cluster_selection_epsilon=0.0,
-        max_cluster_size=None,
-        metric="euclidean",
-        metric_params=None,
-        alpha=1.0,
-        algorithm="auto",
-        leaf_size=40,
-        n_jobs=None,
-        cluster_selection_method="eom",
-        allow_single_cluster=False,
-        store_centers=None,
-        copy="warn",
-    ):
-        super(HDBSCAN, self).__init__(
-            min_cluster_size=min_cluster_size,
-            min_samples=min_samples,
-            cluster_selection_epsilon=cluster_selection_epsilon,
-            max_cluster_size=max_cluster_size,
-            metric=metric,
-            metric_params=metric_params,
-            alpha=alpha,
-            algorithm=algorithm,
-            leaf_size=leaf_size,
-            n_jobs=n_jobs,
-            cluster_selection_method=cluster_selection_method,
-            allow_single_cluster=allow_single_cluster,
-            store_centers=store_centers,
-            copy=copy,
-        )
-        self.min_cluster_size = min_cluster_size
-        self.min_samples = min_samples
-        self.cluster_selection_epsilon = cluster_selection_epsilon
-        self.max_cluster_size = max_cluster_size
-        self.metric = metric
-        self.metric_params = metric_params
-        self.alpha = alpha
-        self.algorithm = algorithm
-        self.leaf_size = leaf_size
-        self.n_jobs = n_jobs
-        self.cluster_selection_method = cluster_selection_method
-        self.allow_single_cluster = allow_single_cluster
-        self.store_centers = store_centers
-        self.copy = copy
-
     _onedal_hdbscan = staticmethod(onedal_HDBSCAN)
 
-    def _onedal_fit(self, X, y, queue=None):
-        xp, _ = get_namespace(X, y)
+    def _onedal_fit(self, X, y=None, queue=None):
+        xp, _ = get_namespace(X)
         X = validate_data(
             self, X, accept_sparse=False, dtype=[xp.float64, xp.float32]
         )
@@ -109,7 +60,7 @@ class HDBSCAN(oneDALEstimator, _sklearn_HDBSCAN):
         }
         self._onedal_estimator = self._onedal_hdbscan(**onedal_params)
 
-        self._onedal_estimator.fit(X, y=y, queue=queue)
+        self._onedal_estimator.fit(X, queue=queue)
         self.labels_ = self._onedal_estimator.labels_
         self.n_features_in_ = X.shape[1]
 
