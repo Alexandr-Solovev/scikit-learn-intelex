@@ -1,5 +1,5 @@
 # ==============================================================================
-# Copyright 2023 Intel Corporation
+# Copyright contributors to the oneDAL project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,14 +14,11 @@
 # limitations under the License.
 # ==============================================================================
 
-from daal4py.sklearn._utils import daal_check_version
+from onedal.spmd.cluster import HDBSCAN as onedal_HDBSCAN
 
-from .dbscan import DBSCAN
-from .hdbscan import HDBSCAN
+from ...cluster import HDBSCAN as HDBSCAN_Batch
 
-if daal_check_version((2023, "P", 200)):
-    from .kmeans import KMeans
 
-    __all__ = ["DBSCAN", "HDBSCAN", "KMeans"]
-else:
-    __all__ = ["DBSCAN", "HDBSCAN"]
+class HDBSCAN(HDBSCAN_Batch):
+    __doc__ = HDBSCAN_Batch.__doc__
+    _onedal_hdbscan = staticmethod(onedal_HDBSCAN)

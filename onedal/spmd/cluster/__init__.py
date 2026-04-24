@@ -17,8 +17,9 @@
 from daal4py.sklearn._utils import daal_check_version
 
 from .dbscan import DBSCAN
+from .hdbscan import HDBSCAN
 
-__all__ = ["DBSCAN"]
+__all__ = ["DBSCAN", "HDBSCAN"]
 
 if daal_check_version((2023, "P", 200)):
     from .kmeans import KMeans
