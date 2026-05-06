@@ -1,0 +1,224 @@
+#===============================================================================
+# Copyright contributors to the oneDAL project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#===============================================================================
+
+name: Build and Test Windows
+
+on:
+  workflow_call:
+    inputs:
+      onedal-artifact-name:
+        description: "Name of the oneDAL build artifact to download"
+        type: string
+        default: "__release_win"
+      oneapi-artifact-name:
+        description: "Name of the Intel BaseKit artifact to download"
+        type: string
+        default: "intel_oneapi_basekit"
+      onedal-artifact-run-id:
+        description: "Run ID to download the artifact from (cross-repo). Leave empty for same-workflow artifact."
+        type: string
+        default: ""
+      onedal-artifact-repo:
+        description: "Repository to download the artifact from (cross-repo). Leave empty for same-repo."
+        type: string
+        default: ""
+      python-version:
+        description: "Python version to use"
+        type: string
+        default: "3.13"
+      sklearn-version:
+        description: "scikit-learn version to install"
+        type: string
+        default: "1.6"
+      no-dpc:
+        description: "Set to '1' to disable DPC++ build/test"
+        type: string
+        default: ""
+      ref:
+        description: "scikit-learn-intelex ref to checkout"
+        type: string
+        default: "main"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Windows Python${{ inputs.python-version }}_Sklearn${{ inputs.sklearn-version }}
+    runs-on: windows-2025
+    timeout-minutes: 120
+
+    env:
+      DPCTL_VERSION: "0.21.1"
+      DPNP_VERSION: "0.19.1"
+      DPCTL_PY_VERSIONS: '3.10\|3.14'
+      NO_DIST: "YES"
+
+    steps:
+      - name: Checkout scikit-learn-intelex
+        uses: actions/checkout@v6
+        with:
+          repository: uxlfoundation/scikit-learn-intelex
+          ref: ${{ inputs.ref }}
+
+      - name: Install Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Download oneDAL build artifact (same workflow)
+        if: inputs.onedal-artifact-run-id == ''
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.onedal-artifact-name }}
+          path: ./__release_win
+
+      - name: Download oneDAL build artifact (cross-repo)
+        if: inputs.onedal-artifact-run-id != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.onedal-artifact-name }}
+          github-token: ${{ github.token }}
+          repository: ${{ inputs.onedal-artifact-repo }}
+          run-id: ${{ inputs.onedal-artifact-run-id }}
+          path: ./__release_win
+
+      - name: Download Intel BaseKit artifact (same workflow)
+        if: inputs.onedal-artifact-run-id == ''
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.oneapi-artifact-name }}
+
+      - name: Download Intel BaseKit artifact (cross-repo)
+        if: inputs.onedal-artifact-run-id != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.oneapi-artifact-name }}
+          github-token: ${{ github.token }}
+          repository: ${{ inputs.onedal-artifact-repo }}
+          run-id: ${{ inputs.onedal-artifact-run-id }}
+
+      - name: Decompress Intel BaseKit
+        shell: cmd
+        run: |
+          tar -xvzf oneapi.tar.gz
+          echo "Unzip complete"
+
+      - name: Set Environment Variables
+        id: set-env
+        shell: cmd
+        run: |
+          echo C:\msys64\usr\bin;>> %GITHUB_PATH%
+          echo NO_DIST=YES>> %GITHUB_ENV%
+          set DPCFLAG=${{ inputs.no-dpc }}
+          if "%DPCFLAG%"=="" (
+            set DPCTL_TEMP="${{ env.DPCTL_PY_VERSIONS }}"
+            if not !DPCTL_TEMP:${{ inputs.python-version }}=!=!DPCTL_TEMP! (
+              echo DPCFLAG=>> %GITHUB_OUTPUT%
+            ) else (
+              echo DPCFLAG="0">> %GITHUB_OUTPUT%
+            )
+          ) else (
+            echo DPCFLAG="0">> %GITHUB_OUTPUT%
+          )
+
+      - name: Download Intel OpenCL CPU Runtime artifact (same workflow)
+        if: steps.set-env.outputs.DPCFLAG == '' && inputs.onedal-artifact-run-id == ''
+        uses: actions/download-artifact@v8
+        with:
+          name: opencl_rt_installer
+          path: .
+
+      - name: Download Intel OpenCL CPU Runtime artifact (cross-repo)
+        if: steps.set-env.outputs.DPCFLAG == '' && inputs.onedal-artifact-run-id != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: opencl_rt_installer
+          github-token: ${{ github.token }}
+          repository: ${{ inputs.onedal-artifact-repo }}
+          run-id: ${{ inputs.onedal-artifact-run-id }}
+          path: .
+
+      - name: Install Intel OpenCL CPU Runtime
+        if: steps.set-env.outputs.DPCFLAG == ''
+        run: |
+          Start-Process msiexec -ArgumentList "/i opencl_rt.msi /qn" -Wait
+          echo "Installed Intel OpenCL CPU Runtime"
+
+      - name: Install dependencies
+        shell: cmd
+        run: |
+          python -m venv venv
+          call .\venv\Scripts\activate.bat
+          pip install --upgrade setuptools
+          pip install cpufeature pyyaml
+          pip install -r dependencies-dev
+
+      - name: System info
+        shell: cmd
+        run: |
+          call .\venv\Scripts\activate.bat
+          call .\oneapi\setvars.bat
+          bash .ci/scripts/describe_system.sh
+
+      - name: Build daal4py/sklearnex
+        shell: cmd
+        run: |
+          call .\venv\Scripts\activate.bat
+          call .\.github\scripts\activate_components.bat ${{ steps.set-env.outputs.DPCFLAG }}
+          set PREFIX=.
+          set PYTHON=python
+          call .\conda-recipe\bld.bat
+
+      - name: Install testing requirements
+        shell: cmd
+        run: |
+          call .\venv\Scripts\activate.bat
+          call .\.github\scripts\activate_components.bat ${{ steps.set-env.outputs.DPCFLAG }}
+          bash .ci/scripts/setup_sklearn.sh ${{ inputs.sklearn-version }}
+          pip install --upgrade -r requirements-test.txt
+          for /f "delims=" %%c in ('python .ci\scripts\get_compatible_scipy_version.py ${{ inputs.sklearn-version }}') do set SCIPY_VERSION=%%c
+          pip install %SCIPY_VERSION%
+          if "${{ steps.set-env.outputs.DPCFLAG }}"=="" pip install dpctl==${{ env.DPCTL_VERSION }} dpnp==${{ env.DPNP_VERSION }}
+          pip list
+
+      - name: Sklearnex testing
+        shell: cmd
+        run: |
+          call .\venv\Scripts\activate.bat
+          call .\.github\scripts\activate_components.bat ${{ steps.set-env.outputs.DPCFLAG }}
+          set PYTHON=python
+          cd ..
+          call scikit-learn-intelex\conda-recipe\run_test.bat scikit-learn-intelex\
+
+      - name: Sklearn testing
+        if: success() || failure()
+        shell: cmd
+        run: |
+          call .\venv\Scripts\activate.bat
+          call .\.github\scripts\activate_components.bat ${{ steps.set-env.outputs.DPCFLAG }}
+          if "${{ steps.set-env.outputs.DPCFLAG }}"=="" set CPU=cpu
+          bash .ci/scripts/run_sklearn_tests.sh %CPU%
+
+      - name: Sklearn testing [preview]
+        if: success() || failure()
+        shell: cmd
+        run: |
+          call .\venv\Scripts\activate.bat
+          call .\.github\scripts\activate_components.bat ${{ steps.set-env.outputs.DPCFLAG }}
+          if "${{ steps.set-env.outputs.DPCFLAG }}"=="" set CPU=cpu
+          set SKLEARNEX_PREVIEW=YES
+          bash .ci/scripts/run_sklearn_tests.sh %CPU%

@@ -1,0 +1,184 @@
+#===============================================================================
+# Copyright contributors to the oneDAL project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#===============================================================================
+
+name: Build and Test Linux
+
+on:
+  workflow_call:
+    inputs:
+      onedal-artifact-name:
+        description: "Name of the oneDAL build artifact to download"
+        type: string
+        default: "__release_lnx"
+      onedal-artifact-run-id:
+        description: "Run ID to download the artifact from (cross-repo). Leave empty for same-workflow artifact."
+        type: string
+        default: ""
+      onedal-artifact-repo:
+        description: "Repository to download the artifact from (cross-repo). Leave empty for same-repo."
+        type: string
+        default: ""
+      python-version:
+        description: "Python version to use"
+        type: string
+        default: "3.13"
+      sklearn-version:
+        description: "scikit-learn version to install"
+        type: string
+        default: "1.6"
+      no-dpc:
+        description: "Set to '1' to disable DPC++ build/test"
+        type: string
+        default: ""
+      ref:
+        description: "scikit-learn-intelex ref to checkout"
+        type: string
+        default: "main"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Linux Python${{ inputs.python-version }}_Sklearn${{ inputs.sklearn-version }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    env:
+      DPCTL_VERSION: "0.21.1"
+      DPNP_VERSION: "0.19.1"
+      DPCPP_RT_VERSION: "2025.3.3"
+      DPCTL_PY_VERSIONS: '3.10\|3.14'
+      NO_DIST: "1"
+
+    steps:
+      - name: Checkout scikit-learn-intelex
+        uses: actions/checkout@v6
+        with:
+          repository: uxlfoundation/scikit-learn-intelex
+          ref: ${{ inputs.ref }}
+
+      - name: Install Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Download oneDAL build artifact (same workflow)
+        if: inputs.onedal-artifact-run-id == ''
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.onedal-artifact-name }}
+          path: ./__release_lnx
+
+      - name: Download oneDAL build artifact (cross-repo)
+        if: inputs.onedal-artifact-run-id != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.onedal-artifact-name }}
+          github-token: ${{ github.token }}
+          repository: ${{ inputs.onedal-artifact-repo }}
+          run-id: ${{ inputs.onedal-artifact-run-id }}
+          path: ./__release_lnx
+
+      - name: Download oneDAL environment artifact (cross-repo)
+        if: inputs.onedal-artifact-run-id != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: oneDAL_env
+          github-token: ${{ github.token }}
+          repository: ${{ inputs.onedal-artifact-repo }}
+          run-id: ${{ inputs.onedal-artifact-run-id }}
+          path: .ci/env
+
+      - name: Set Environment Variables
+        id: set-env
+        run: |
+          echo "NO_DIST=1" >> "$GITHUB_ENV"
+          DPCFLAG="${{ inputs.no-dpc }}"
+          if [ -z "$DPCFLAG" ]; then
+            if [ $(echo ${{ inputs.python-version }} | grep '${{ env.DPCTL_PY_VERSIONS }}') ]; then
+              DPCFLAG=''
+            else
+              DPCFLAG='0'
+            fi
+          fi
+          echo "DPCFLAG=${DPCFLAG}" >> "$GITHUB_OUTPUT"
+
+      - name: apt-get
+        run: sudo apt-get update
+
+      - name: DPC++ installation
+        if: steps.set-env.outputs.DPCFLAG == ''
+        run: |
+          bash .ci/env/apt.sh dpcpp
+
+      - name: System info
+        run: |
+          if [ -f /opt/intel/oneapi/setvars.sh ]; then
+            source /opt/intel/oneapi/setvars.sh
+          fi
+          bash .ci/scripts/describe_system.sh
+
+      - name: Install develop requirements
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r dependencies-dev
+          pip list
+          echo "NUMPY_BUILD=$(python -m pip freeze | grep numpy)" >> "$GITHUB_ENV"
+
+      - name: Build daal4py/sklearnex
+        run: |
+          source venv/bin/activate
+          source .github/scripts/activate_components.sh ${{ steps.set-env.outputs.DPCFLAG }}
+          python setup.py install --single-version-externally-managed --record=record.txt
+
+      - name: Install testing requirements
+        run: |
+          source venv/bin/activate
+          source .github/scripts/activate_components.sh
+          bash .ci/scripts/setup_sklearn.sh ${{ inputs.sklearn-version }}
+          pip install --upgrade -r requirements-test.txt
+          pip install $(python .ci/scripts/get_compatible_scipy_version.py ${{ inputs.sklearn-version }}) pyyaml
+          if [ "${{ steps.set-env.outputs.DPCFLAG }}" == "" ]; then
+            pip install dpctl==${{ env.DPCTL_VERSION }} dpnp==${{ env.DPNP_VERSION }}
+            pip install dpcpp-cpp-rt==${{ env.DPCPP_RT_VERSION }}
+          fi
+          pip list
+
+      - name: Sklearnex testing
+        run: |
+          source venv/bin/activate
+          source .github/scripts/activate_components.sh
+          cd .ci
+          ../conda-recipe/run_test.sh
+
+      - name: Sklearn testing
+        if: success() || failure()
+        run: |
+          source venv/bin/activate
+          source .github/scripts/activate_components.sh
+          if [ "${{ steps.set-env.outputs.DPCFLAG }}" == "" ]; then export CPU=cpu; fi
+          bash .ci/scripts/run_sklearn_tests.sh $CPU
+
+      - name: Sklearn testing [preview]
+        if: success() || failure()
+        run: |
+          source venv/bin/activate
+          source .github/scripts/activate_components.sh
+          if [ "${{ steps.set-env.outputs.DPCFLAG }}" == "" ]; then export CPU=cpu; fi
+          export SKLEARNEX_PREVIEW='YES'
+          bash .ci/scripts/run_sklearn_tests.sh $CPU
