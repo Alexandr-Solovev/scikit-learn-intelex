@@ -87,7 +87,12 @@ dal::table convert_to_homogen_impl(py::object obj) {
 
     // Get `__sycl_usm_array_interface__['data'][0]`, the first element of data entry,
     // which is a Python integer encoding USM pointer value.
-    const auto* const ptr = reinterpret_cast<const Type*>(get_sua_ptr(sua_iface_dict));
+    // Then advance by `__sycl_usm_array_interface__['offset']` element units so that
+    // sliced views (e.g. dpnp.ndarray[i:j]) point at the slice start rather than at the
+    // base allocation. Offset defaults to 0 per the SUA v1 spec.
+    const auto sua_offset = get_sua_offset(sua_iface_dict);
+    const auto* const ptr =
+        reinterpret_cast<const Type*>(get_sua_ptr(sua_iface_dict)) + sua_offset;
 
     // Get SYCL object from `__sycl_usm_array_interface__["syclobj"]`.
     // syclobj: Python object from which SYCL context to which represented USM

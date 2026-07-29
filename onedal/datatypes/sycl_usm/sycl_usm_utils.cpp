@@ -89,6 +89,20 @@ bool is_sua_readonly(const py::dict& sua) {
     return data[1ul].cast<bool>();
 }
 
+// Get `__sycl_usm_array_interface__['offset']`, an optional integer offset from the
+// start of the buffer to the first array element, expressed in element units.
+// Defaults to zero when the key is absent (SUA v1 spec).
+std::int64_t get_sua_offset(const py::dict& sua) {
+    if (!sua.contains("offset")) {
+        return 0l;
+    }
+    const auto raw_offset = sua["offset"];
+    if (raw_offset.is_none()) {
+        return 0l;
+    }
+    return raw_offset.cast<std::int64_t>();
+}
+
 // Get `__sycl_usm_array_interface__['shape']`.
 // shape : a tuple of integers describing dimensions of an N-dimensional array.
 py::tuple get_sua_shape(const py::dict& sua) {
